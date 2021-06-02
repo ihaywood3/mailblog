@@ -1,0 +1,22 @@
+<!DOCTYPE html>
+<html lang="en"><head>
+      <meta http-equiv="content-type" content="text/html; charset=UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1">
+      <meta name="description" content="personal blog of ${author}">
+      <meta name="keywords" contents="${tags}">
+      <meta name="author" content="${author}">
+      <link rel="stylesheet" href="/blog/style.css" />
+      <title>${title}</title>
+      % if atom_url:
+          <link rel="alternate" type="application/atom+xml" 
+		title="Atom Feed for ${author}" 
+		href="${atom_url}" />
+      % endif
+      <%block  name="head"/>
+   </head>
+   <body>
+     ${self.body()}
+   </body>
+</html>
+				   
+				     

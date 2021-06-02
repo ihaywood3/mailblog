@@ -1,0 +1,24 @@
+<%inherit file="base.html" />
+
+<div class="invis"><a href="mailto://honeypot@haywood.id.au">Honeypot (DO NOT USE)</a></div>
+
+<h1>Email-based Blogging</h1>
+
+<p>This is a basic blogging platform inspired by <a href="https://www.hey.com/world/">Hey, World</a></p>
+
+<p>To post, email <a href="mailto://world@haywood.id.au"><tt>world@haywood.id.au</tt></a>.
+  There is no need to register, an account will be created the first time you send an email. </p>
+
+<p>If you send an HTML email, that will be used. If plain text, it will be interpreted as
+  <a href="https://www.markdownguide.org/">Markdown</a>. </p>
+
+<p>Images are not supported. If they are in the future, registration/payment of some sort will be
+  required. </p>
+
+<h2>Recent Posts</h2>
+
+<ul class="docs">
+  % for doc,u in docs:
+    <li><a href="${doc.url()}">${u.author} ${doc.strftime("%c")} ${doc.subject|h}</a>
+  % endfor
+</ul>  
