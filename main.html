@@ -18,7 +18,7 @@
 <h2>Recent Posts</h2>
 
 <ul class="docs">
-  % for doc,u in docs:
-    <li><a href="${doc.url()}">${u.author} ${doc.strftime("%c")} ${doc.subject|h}</a>
+  % for doc in docs:
+    <li><a href="${doc.url()}">${doc["author"]} ${doc.strftime("%c")} ${doc["subject"]|h}</a>
   % endfor
 </ul>  

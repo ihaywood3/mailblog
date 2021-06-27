@@ -1,7 +1,9 @@
 <%inherit file="base.html" />
 
+<h1>Articles: ${author}'s blog</h1>
+
 <ul class="docs">
   % for doc in docs:
-    <li><a href="${doc.url()}">${doc.strftime("%c")} ${doc.subject}</a>
+    <li><a href="${doc.url()}">${doc.strftime("%c")} ${doc["subject"]}</a>
   % endfor
 </ul>  

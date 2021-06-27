@@ -6,17 +6,17 @@
   <title>(</title>
   <%! import datetime %>
   <updated>${datetime.datetime.now().strftime("%Y-%m-%dT%H:%M:%SZ")}</updated>
-  % for u,doc in docs:
+  % for doc in docs:
     <entry>
-      <id>tag:haywood.id.au,2021:/${u.name}/${doc.id}</id>
+      <id>tag:haywood.id.au,2021:/${doc["name"]}/${doc["rowid"]}</id>
       <published>${doc.strftime("%Y-%m-%dT%H:%M:%SZ")}</published>
       <updated>${doc.strftime("%Y-%m-%dT%H:%M:%SZ")}</updated>
       <link rel="alternate" type="text/html" href="${doc.url()}"/>
-      <title>${doc.subject|x}</title>
-      <content type="html">${doc.content|x}</content>
+      <title>${doc["subject"]|x}</title>
+      <content type="html">${doc["content"]|x}</content>
       <author>
-	<name>${u.author}</name>
-	<email>${doc.email}</email>
+	<name>${doc["author"]}</name>
+	<email>${doc["email"]}</email>
       </author>
     </entry>
     % endfor

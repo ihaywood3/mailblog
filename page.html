@@ -1,6 +1,8 @@
 <%inherit file="base.html" />
 
-${doc.content}
+<h1>${title}</h1>
+
+${doc["content"]}
 
 <p>
   % if prev:
@@ -12,5 +14,6 @@ ${doc.content}
   % if next:
   <a href="${next.url()}">next</a>
   % endif
+  &nbsp;|&nbsp;<a href="${index_url}">index</a>
 </p>
   

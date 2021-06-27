@@ -14,57 +14,60 @@ import io
 
 import markdown
 from mako.lookup import TemplateLookup
-from sqlalchemy import create_engine, Column, String, DateTime, Integer, Boolean
-from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import sessionmaker
-
+import trivial_orm
 
 PUBLIC_HTML = os.path.expanduser("~/public_html")
-ROOT = os.path.expanduser("~/preserve/blog")
+ROOT = os.path.expanduser("~/preserve/mailblog/")
 URL = "/blog"
 
 lu = TemplateLookup(directories=[ROOT])
 
 mdp = markdown.Markdown(extensions=["meta"])
 
+os.umask(0o022)  # postfix sets umask to odd value
 
-Session = sessionmaker()
-Base = declarative_base()
-
-
-class User(Base):
-    __tablename__ = "users"
-    id = Column(Integer, primary_key=True)
-    email = Column(String)
-    name = Column(String)
-    images = Column(Boolean, default=False)
-    payment_token = Column(String)
-    crypto_token = Column(String)
-    created = Column(DateTime, default=datetime.datetime.now)
-    author = Column(String)
+SCHEMA = """
+create table users (
+    email text,
+    name text,
+    images text,
+    payment_token text,
+    crypto_token text,
+    created timestamp,
+    author text ); 
 
 
-class Post(Base):
-    __tablename__ = "posts"
-    id = Column(Integer, primary_key=True)
-    email = Column(String)
-    name = Column(String)
-    content = Column(String)
-    time = Column(DateTime)
-    keywords = Column(String)
-    toot_id = Column(String)
-    subject = Column(String)
+create table posts (
+    rowid integer primary key,
+    post_email text,
+    content text,
+    "time" timestamp,
+    keywords text,
+    toot_id text,
+    subject text ); 
+
+create view vwposts as
+select * from users, posts where email = post_email; 
+"""
+
+
+class Post:
+    def __init__(self, row):
+        self.row = row
+
+    def __getitem__(self, key):
+        return self.row[key]
 
     def fname(self):
-        s = self.subject.lower().strip().replace(" ", "_")
+        s = self.row["subject"].lower().strip().replace(" ", "_")
         s = re.sub(r"\W+", "", s).replace("_", "-")
-        return "%s-%s.html" % (s, base26(self.id))
+        return "%s-%s.html" % (s, base26(self.row["rowid"]))
 
     def url(self):
-        return os.path.join(URL, self.fname())
+        return os.path.join(URL, self.row["name"], self.fname())
 
     def strftime(self, fmt):
-        return self.time.strftime(fmt)
+        return self.row["time"].strftime(fmt)
 
 
 ALLOWED_TAGS = {"a", "p", "i", "b", "ul", "li", "h1", "h2", "h3", "h4", "h5"}
@@ -112,15 +115,18 @@ def base26(n):
         return ""
 
 
+db = None
+
+
 def file_db():
-    engine = create_engine("sqlite:///" + os.path.join(ROOT, "blog.db"))
-    Session.configure(bind=engine)
+    global db
+    db = trivial_orm.SqliteWrapper(os.path.join(ROOT, "blog.db"))
 
 
 def memory_db():
-    engine = create_engine("sqlite://")
-    Session.configure(bind=engine)
-    Base.metadata.create_all(engine)
+    global db
+    db = trivial_orm.SqliteWrapper()
+    db.db.executescript(SCHEMA)
 
 
 def write_file(templ, sdir, fname, **kwargs):
@@ -135,22 +141,19 @@ def write_file(templ, sdir, fname, **kwargs):
         fd.write(lu.get_template(templ).render(**kwargs))
 
 
-def delete_account(email):
-    s = Session()
-    u = s.query(User).filter_by(email=email).one()
-    p = os.path.join(PUBLIC_HTML, u.name)
+def delete_account(name):
+    u = db.select("users", name=name).fetchone()
+    p = os.path.join(PUBLIC_HTML, u["name"])
     for i in os.listdir(p):
         os.unlink(os.path.join(p, i))
     os.rmdir(p)
-    s.delete(u)
-    s.query(Post).filter_by(email=email).delete()
-    s.commit()
+    db.delete("users", name=name)
+    db.delete("posts", post_email=u["email"])
 
 
 def get_account(from_):
-    s = Session()
     author, email = parseaddr(from_)
-    u = s.query(User).filter_by(email=email).one_or_none()
+    u = db.select("users", email=email).fetchone()
     if u:
         return (u, False)
     a, b = email.split("@")
@@ -160,11 +163,12 @@ def get_account(from_):
     name3 = "%s_1" % a
     name4 = "%s_%s" % (a, b)
     for n in [name1, name2, name3, name4]:
-        u = s.query(User).filter_by(name=n).one_or_none()
+        u = db.select("users", name=n).fetchone()
         if not u:
-            u = User(email=email, name=n, author=author)
-            s.add(u)
-            s.commit()
+            u = dict(
+                email=email, name=n, author=author, created=datetime.datetime.now()
+            )
+            db.insert("users", **u)
             return (u, True)
 
 
@@ -187,17 +191,19 @@ def mail2post(mail, u):
         html = _html_parse(html)
     else:
         html = mdp.convert(plain)
-    t = parsedate_to_datetime(mail["Date"])
-    p = Post(email=u.email, name=u.name, time=t, content=html, subject=mail["Subject"])
-    s = Session()
-    s.add(p)
-    s.commit()
+    t = parsedate_to_datetime(mail["Date"]).replace(tzinfo=None)
+    db.insert(
+        "posts", post_email=u["email"], time=t, content=html, subject=mail["Subject"]
+    )
 
 
 def emit_for_user(u):
-    s = Session()
-    q = s.query(Post).filter_by(name=u.name).order_by(Post.time)
-    docs = list(q.all())
+    docs = [
+        Post(i)
+        for i in db.db.execute(
+            'select * from vwposts where email = ? order by "time"', (u["email"],)
+        )
+    ]
     for i in range(len(docs)):
         doc = docs[i]
         if i > 0:
@@ -209,37 +215,39 @@ def emit_for_user(u):
         else:
             next = None
         write_file(
-            "/page.html",
-            u.name,
+            "page.html",
+            u["name"],
             doc.fname(),
             doc=doc,
             prev=prev,
             next=next,
-            title=doc.subject,
-            tags=doc.keywords,
-            author=u.author,
-            atom_url=os.path.join(URL, u.name, "feed.xml"),
+            title=doc["subject"],
+            tags=doc["keywords"],
+            author=u["author"],
+            atom_url=os.path.join(URL, u["name"], "feed.xml"),
+            index_url=os.path.join(URL, u["name"], "index.html"),
         )
     write_file(
         "/index.html",
-        u.name,
+        u["name"],
         "index.html",
         docs=docs,
-        title="Articles",
+        title="Articles for %s's blog" % u["author"],
         tags="blog",
-        author=u.author,
-        atom_url=os.path.join(URL, u.name, "feed.xml"),
+        author=u["author"],
+        atom_url=os.path.join(URL, u["name"], "feed.xml"),
     )
     write_file(
-        "/user-feed.xml", u.name, "feed.xml", docs=docs, author=u.author, name=u.name
+        "/user-feed.xml",
+        u["name"],
+        "feed.xml",
+        docs=docs,
+        author=u["author"],
+        name=u["name"],
     )
-    docs = (
-        s.query(Post, User)
-        .join(User.email == Post.email)
-        .order_by(Post.time)
-        .limit(20)
-        .all()
-    )
+    docs = [
+        Post(i) for i in db.db.execute('select * from vwposts order by "time" limit 20')
+    ]
     write_file(
         "main.html",
         None,
@@ -252,14 +260,10 @@ def emit_for_user(u):
 
 
 def new_users_feed():
-    s = Session()
-    docs = (
-        s.query(User, Post)
-        .join(User.email == Post.email)
-        .sort_by(User.c.created, Post.c.time)
-        .limit(20)
-        .all()
-    )
+    docs = [
+        Post(i)
+        for i in db.db.execute('select * from vwposts order by created,"time" limit 20')
+    ]
     write_file(
         "new-feed.xml",
         None,
@@ -276,4 +280,14 @@ def process_mail(mail):
         new_users_feed()
 
 
-#    mail = message_from_binary_file(f, policy=default)
+if __name__ == "__main__":
+    file_db()
+    cmd = sys.argv[1]
+    if cmd == "mail":
+        mail = message_from_binary_file(sys.stdin.buffer, policy=default)
+        process_mail(mail)
+    elif cmd == "del":
+        delete_account(sys.argv[2])
+    elif cmd == "create":
+        db.db.executescript(SCHEMA)
+    db.db.commit()
