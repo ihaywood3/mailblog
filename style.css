@@ -1,0 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300;0,400;0,600;0,700;0,800;1,300;1,400;1,600;1,700;1,800&display=swap');
+
+body {
+    font-family: 'Open Sans', Verdana, sans-serif;
+    line-height: 1.4;
+    padding: 0;
+    margin-left: 1ex;
+    margin-right: 1ex;
+    counter-reset: section; 
+}
+
+p:nth-child(2)::first-letter {
+    font-size: 1.8em;
+    text-shadow: 1px 1px 0 rgba(255,255,255,0.4);
+}
+
+div.invis {
+    display: none;
+}
+
+ul.docs {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+h1 {
+    font-weight: 800;
+}
+
+h2 {
+    counter-reset: subsection;
+    font-weight: 800;
+}
+
+h2:before {
+    counter-increment: section;
+    content: counter(section) "\0000a0";
+}
+h3 {
+    counter-reset: subsubsection;
+}
+h3:before {
+    counter-increment: subsection;
+    content: counter(section) "." counter(subsection) "\0000a0";
+}
+h4:before {
+    counter-increment: subsubsection;
+    content: counter(section) "." counter(subsection) "." counter(subsubsection) "\0000a0";   
+}

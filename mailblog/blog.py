@@ -1,7 +1,7 @@
 #!/usr/bin/python3
 import os
 import os.path
-import time
+from importlib.resources import read_text
 import datetime
 from email import message_from_binary_file
 from email.policy import default
@@ -11,16 +11,21 @@ import re
 from html.parser import HTMLParser
 import html
 import io
+import argparse
 
 import markdown
+from mako.template import Template
 from mako.lookup import TemplateLookup
-import trivial_orm
+from mailblog import trivial_orm
 
-PUBLIC_HTML = os.path.expanduser("~/public_html")
-ROOT = os.path.expanduser("~/preserve/mailblog/")
-URL = "/blog"
+URL = "/blog"  # the base URL. If changed needs to be changed in templates also
 
-lu = TemplateLookup(directories=[ROOT])
+
+def lookup(nam):
+    lu = TemplateLookup()
+    lu.put_string("base.html", read_text("mailblog.templates", "base.html"))
+    return Template(read_text("mailblog.templates", nam), lookup=lu)
+
 
 mdp = markdown.Markdown(extensions=["meta"])
 
@@ -118,9 +123,9 @@ def base26(n):
 db = None
 
 
-def file_db():
+def file_db(dbpath):
     global db
-    db = trivial_orm.SqliteWrapper(os.path.join(ROOT, "blog.db"))
+    db = trivial_orm.SqliteWrapper(dbpath)
 
 
 def memory_db():
@@ -138,7 +143,7 @@ def write_file(templ, sdir, fname, **kwargs):
     else:
         p = os.path.join(PUBLIC_HTML, fname)
     with open(p, "w") as fd:
-        fd.write(lu.get_template(templ).render(**kwargs))
+        fd.write(lookup(templ).render(**kwargs))
 
 
 def delete_account(name):
@@ -228,7 +233,7 @@ def emit_for_user(u):
             index_url=os.path.join(URL, u["name"], "index.html"),
         )
     write_file(
-        "/index.html",
+        "index.html",
         u["name"],
         "index.html",
         docs=docs,
@@ -238,7 +243,7 @@ def emit_for_user(u):
         atom_url=os.path.join(URL, u["name"], "feed.xml"),
     )
     write_file(
-        "/user-feed.xml",
+        "user-feed.xml",
         u["name"],
         "feed.xml",
         docs=docs,
@@ -280,14 +285,40 @@ def process_mail(mail):
         new_users_feed()
 
 
-if __name__ == "__main__":
-    file_db()
-    cmd = sys.argv[1]
-    if cmd == "mail":
+def entry_point():
+    global PUBLIC_HTML
+    parser = argparse.ArgumentParser("mailblog", description="blogging from emails")
+    parser.add_argument(
+        "--output",
+        default=os.path.expanduser("~/public_html"),
+        help="directory for HTML files",
+    )
+    parser.add_argument(
+        "--database",
+        default=os.path.expanduser("~/.local/share/mailblog.db"),
+        help="path to database file",
+    )
+    parser.add_argument(
+        "command", choices=["refresh", "del", "mail", "create"], help="the command"
+    )
+    parser.add_argument(
+        "user", nargs="?", metavar="USER", help="name of a user account (del/refresh)"
+    )
+    ns = parser.parse_args()
+    PUBLIC_HTML = ns.output
+    file_db(ns.database)
+    if ns.command == "mail":
         mail = message_from_binary_file(sys.stdin.buffer, policy=default)
         process_mail(mail)
-    elif cmd == "del":
-        delete_account(sys.argv[2])
-    elif cmd == "create":
+    elif ns.command == "del":
+        delete_account(ns.user)
+    elif ns.command == "create":
         db.db.executescript(SCHEMA)
+    elif ns.command == "refresh":
+        u = db.select("users", name=ns.user).fetchone()
+        emit_for_user(u)
     db.db.commit()
+
+
+if __name__ == "__main__":
+    entry_point()
