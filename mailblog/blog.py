@@ -287,14 +287,27 @@ def process_mail(mail):
 
 def entry_point():
     global PUBLIC_HTML
-    parser = argparse.ArgumentParser("mailblog", description="blogging from emails")
+    parser = argparse.ArgumentParser(
+        "mailblog",
+        description="blogging from emails",
+        epilog="""
+Commands
+
+refresh - regenerate HTML for a user
+del - delete a user account
+mail - receive e-mail on standard input
+create - create the SQLite database
+""",
+    )
     parser.add_argument(
         "--output",
+        metavar="DIR",
         default=os.path.expanduser("~/public_html"),
         help="directory for HTML files",
     )
     parser.add_argument(
         "--database",
+        metavar="FILE",
         default=os.path.expanduser("~/.local/share/mailblog.db"),
         help="path to database file",
     )
