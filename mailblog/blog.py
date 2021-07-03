@@ -291,12 +291,11 @@ def entry_point():
         "mailblog",
         description="blogging from emails",
         epilog="""
-Commands
-
-refresh - regenerate HTML for a user
-del - delete a user account
-mail - receive e-mail on standard input
-create - create the SQLite database
+Commands:
+refresh - regenerate HTML for a user. 
+del - delete a user account. 
+mail - receive e-mail on standard input. 
+create - create the SQLite database. 
 """,
     )
     parser.add_argument(
@@ -312,7 +311,10 @@ create - create the SQLite database
         help="path to database file",
     )
     parser.add_argument(
-        "command", choices=["refresh", "del", "mail", "create"], help="the command"
+        "command",
+        metavar="CMD",
+        choices=["refresh", "del", "mail", "create"],
+        help="the command",
     )
     parser.add_argument(
         "user", nargs="?", metavar="USER", help="name of a user account (del/refresh)"
